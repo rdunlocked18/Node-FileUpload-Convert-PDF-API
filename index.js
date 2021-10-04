@@ -6,7 +6,9 @@ const app = express();
 const libre = require('libreoffice-convert');
 const PATH = require('path');
 const fs = require('fs');
-const fromPath = require("pdf2pic");
+const {
+    fromPath
+} = require("pdf2pic");
 const mkdirsSync = require("fs-extra");
 const rimraf = require("rimraf");
 const PORT = 8000;
@@ -16,6 +18,7 @@ const dirTree = require("directory-tree");
 const extend = '.pdf'
 //const enterPath = path.join(__dirname, '/resources/Book.xlsx');
 const outputPath = PATH.join(__dirname, `/resources/doc${extend}`);
+const outputDirectory = PATH.join(__dirname, '/resources/converted');
 var file;
 
 
@@ -39,6 +42,14 @@ app.listen(PORT, function() {
 // Check Sample Response
 app.get('/ping', function(req, res) {
     res.send('pong');
+    //  // Currently initializing before conversion so [Exception Thrown]
+    //  var filteredTree = dirTree(outputDirectory, ['.jpg', '.png'], {
+    //     attributes: ['size', 'size']
+    // });
+    // console.log("Load Json file" + c);
+    // // res.send({
+    // //     ob: filteredTree
+    // // });
 });
 
 
@@ -52,8 +63,7 @@ app.post('/convert', function(req, res) {
         return;
     }
 
-
-    storedFile = req.files.sampleFile;
+    storedFile = req.files.storedFile;
     uploadPath = __dirname + '/resources/' + storedFile.name;
 
     storedFile.mv(uploadPath, function(err) {
@@ -65,21 +75,12 @@ app.post('/convert', function(req, res) {
 
         // TODO : Make this call async as response should 
         // be shown after all processes are completed
-        convertFileToPdf().then((c) => {
-            // Currently initializing before conversion so [Exception Thrown]
-            var filteredTree = dirTree(outputDirectory, ['.jpg', '.png'], {
-                attributes: ['size', 'size']
-            });
-            console.log("Load Json file" + c);
-            res.send({
-                ob: filteredTree
-            });
-        });
+        convertFileToPdf();
     })
 });
 
 // Convert any Office file type to PDF
-async function convertFileToPdf() {
+function convertFileToPdf() {
     libre.convert(file, extend, undefined, (err, done) => {
         if (err) {
             console.log(`Error converting file: ${err}`);
@@ -94,18 +95,14 @@ async function convertFileToPdf() {
 }
 
 // Converting PDF >> Image as Unity requires Image Textures
-async function convertToImage() {
+function convertToImage() {
 
-    const fileLocation = outputPath;
-
-    const outputDirectory = PATH.join(__dirname, '/resources/converted');
+    const specimen1 = outputPath;
 
     rimraf.sync(outputDirectory);
 
-    mkdirsSync(outputDirectory);
+    fs.mkdirSync(outputDirectory);
 
-    // Currently Size is very huge 
-    // TODO : Dynamic Size WxH
     const baseOptions = {
         width: 2550,
         height: 3300,
@@ -113,13 +110,13 @@ async function convertToImage() {
         savePath: outputDirectory
     };
 
-    const convert = fromPath(fileLocation, baseOptions);
+    const convert = fromPath(specimen1, baseOptions);
 
     convert.bulk(-1).then((resolve) => {
-        console.log("Done Conversion");
-        // We can return response here but [EXPRESS post OUT OF SCOPE]
+        console.log("Done Conversion Need CB");
         return resolve;
     });
+
     console.log("Code End");
 
 }
