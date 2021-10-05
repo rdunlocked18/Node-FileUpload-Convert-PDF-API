@@ -31,7 +31,7 @@ function init() {
     }));
     app.use(express.json());
     //form-urlencoded
-
+    app.use('/resources/converted/', express.static(outputDirectory));
     // for parsing multipart/form-data
     //app.use(mulupload.single('fileToConvert')); 
     app.use('/form', express.static(__dirname + '/index.html'));
@@ -60,7 +60,7 @@ eventEmitter.on('converted', () => {
         var filteredTree = dirTree(outputDirectory, { attributes: ['mode', 'mtime', 'size'] },
             (file) => {
                 console.log(file.name);
-                ls.push("http://192.168.29.195/resources/converted/" + file.name)
+                ls.push("http://localhost:8000/resources/converted/" + file.name)
             });
         //console.log("Load Json file" + c);
 
@@ -104,16 +104,20 @@ app.post('/convert', function (req, res) {
     })
 
     async function convertToPdf() {
-        libre.convert(file, extend, undefined, async (err, done) => {
-            if (err) {
-                console.log(`Error converting file: ${err}`);
-            }
+        return new Promise((resolve, reject) => {
+            // ... 
+            libre.convert(file, extend, undefined, async (err, done) => {
+                if (err) {
+                    console.log(`Error converting file: ${err}`);
+                }
 
-            fs.writeFileSync(outputPath, done);
-            if (done) {
-                console.log("Converted to PDF");
-                await convertToImage();
-            }
+                fs.writeFileSync(outputPath, done);
+                if (done) {
+                    console.log("Converted to PDF");
+                    await convertToImage();
+                    resolve();
+                }
+            });
         });
     }
 
