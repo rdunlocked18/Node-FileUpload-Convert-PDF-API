@@ -13,48 +13,71 @@ const mkdirsSync = require("fs-extra");
 const rimraf = require("rimraf");
 const PORT = 8000;
 const dirTree = require("directory-tree");
+const { EventEmitter } = require('events');
+const eventEmitter = new EventEmitter();
 
 // IO Constants 
 const extend = '.pdf'
-//const enterPath = path.join(__dirname, '/resources/Book.xlsx');
 const outputPath = PATH.join(__dirname, `/resources/doc${extend}`);
 const outputDirectory = PATH.join(__dirname, '/resources/converted');
 var file;
 
 
-// App Configurations
-// Create resources && converted dirs if not Present
-app.use(express.urlencoded({
-    extended: true
-}));
-app.use(express.json());
-//form-urlencoded
+// ----------- End Declerations --------- //
 
-// for parsing multipart/form-data
-//app.use(mulupload.single('fileToConvert')); 
-app.use('/form', express.static(__dirname + '/index.html'));
-app.use(fileUpload());
-app.listen(PORT, function() {
-    console.log('Server Running On Port :', PORT); // eslint-disable-line
+function init() {
+    app.use(express.urlencoded({
+        extended: true
+    }));
+    app.use(express.json());
+    //form-urlencoded
+
+    // for parsing multipart/form-data
+    //app.use(mulupload.single('fileToConvert')); 
+    app.use('/form', express.static(__dirname + '/index.html'));
+    app.use(fileUpload());
+    app.listen(PORT, function () {
+        console.log('Server Running On Port :', PORT); // eslint-disable-line
+    });
+}
+
+init();
+
+function sampleGetResponse() {
+    // Check Sample Response
+    app.get('/ping', function (req, res) {
+        res.send('pong');
+    });
+}
+
+// Event
+eventEmitter.on('converted', () => {
+    console.log("Callback with event");
+
+    app.get('/files', function (req, res) {
+        var ls = []
+        // Currently initializing before conversion so [Exception Thrown]
+        var filteredTree = dirTree(outputDirectory, { attributes: ['mode', 'mtime', 'size'] },
+            (file) => {
+                console.log(file.name);
+                ls.push("http://192.168.29.195/resources/converted/" + file.name)
+            });
+        //console.log("Load Json file" + c);
+
+        res.send({ info: filteredTree, urls: [ls] });
+    })
 });
 
-
-// Check Sample Response
-app.get('/ping', function(req, res) {
-    res.send('pong');
-    //  // Currently initializing before conversion so [Exception Thrown]
-    //  var filteredTree = dirTree(outputDirectory, ['.jpg', '.png'], {
-    //     attributes: ['size', 'size']
-    // });
-    // console.log("Load Json file" + c);
-    // // res.send({
-    // //     ob: filteredTree
-    // // });
-});
+function fullUrl(req) {
+    return url.format({
+        protocol: req.protocol,
+        host: req.get('host'),
+        pathname: req.originalUrl
+    });
+}
 
 
-// Post Request and Upload
-app.post('/convert', function(req, res) {
+app.post('/convert', function (req, res) {
     let storedFile;
     let uploadPath;
 
@@ -66,7 +89,7 @@ app.post('/convert', function(req, res) {
     storedFile = req.files.storedFile;
     uploadPath = __dirname + '/resources/' + storedFile.name;
 
-    storedFile.mv(uploadPath, function(err) {
+    storedFile.mv(uploadPath, async function (err) {
         if (err) {
             return res.status(500).send(err);
         }
@@ -75,48 +98,51 @@ app.post('/convert', function(req, res) {
 
         // TODO : Make this call async as response should 
         // be shown after all processes are completed
-        convertFileToPdf();
+        await convertToPdf();
+        // redirecting before convert operation
+        res.redirect('/files');
     })
+
+    async function convertToPdf() {
+        libre.convert(file, extend, undefined, async (err, done) => {
+            if (err) {
+                console.log(`Error converting file: ${err}`);
+            }
+
+            fs.writeFileSync(outputPath, done);
+            if (done) {
+                console.log("Converted to PDF");
+                await convertToImage();
+            }
+        });
+    }
+
+    // Converting PDF >> Image as Unity requires Image Textures
+    async function convertToImage() {
+
+        const specimen1 = outputPath;
+
+        rimraf.sync(outputDirectory);
+
+        fs.mkdirSync(outputDirectory);
+
+        const baseOptions = {
+            width: 2550,
+            height: 3300,
+            density: 330,
+            savePath: outputDirectory
+        };
+
+        const convert = fromPath(specimen1, baseOptions);
+
+        const resolve = await convert.bulk(-1);
+
+        console.log("Done Conversion Need CB");
+        eventEmitter.emit('converted');
+        console.log("Code End");
+
+    }
+
 });
 
-// Convert any Office file type to PDF
-function convertFileToPdf() {
-    libre.convert(file, extend, undefined, (err, done) => {
-        if (err) {
-            console.log(`Error converting file: ${err}`);
-        }
 
-        fs.writeFileSync(outputPath, done);
-        if (done) {
-            console.log("Converted to PDF");
-            convertToImage();
-        }
-    });
-}
-
-// Converting PDF >> Image as Unity requires Image Textures
-function convertToImage() {
-
-    const specimen1 = outputPath;
-
-    rimraf.sync(outputDirectory);
-
-    fs.mkdirSync(outputDirectory);
-
-    const baseOptions = {
-        width: 2550,
-        height: 3300,
-        density: 330,
-        savePath: outputDirectory
-    };
-
-    const convert = fromPath(specimen1, baseOptions);
-
-    convert.bulk(-1).then((resolve) => {
-        console.log("Done Conversion Need CB");
-        return resolve;
-    });
-
-    console.log("Code End");
-
-}
