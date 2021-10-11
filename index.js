@@ -60,11 +60,12 @@ eventEmitter.on('converted', () => {
         var filteredTree = dirTree(outputDirectory, { attributes: ['mode', 'mtime', 'size'] },
             (file) => {
                 console.log(file.name);
-                ls.push("http://localhost:8000/resources/converted/" + file.name)
+                ls.push("http://192.168.29.195:8000/resources/converted/" + file.name)
             });
         //console.log("Load Json file" + c);
-
-        res.send({ info: filteredTree, urls: [ls] });
+        // For File Info : 
+        //  res.send({ info: filteredTree, urls: ls });
+        res.send({ urls: ls });
     })
 });
 
